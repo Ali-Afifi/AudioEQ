@@ -1,0 +1,8 @@
+numpy
+scipy
+matplotlib
+pandas
+bokeh==2.4.3
+soundfile
+panel==0.14.1
+hvplot
