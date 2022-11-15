@@ -1,10 +1,12 @@
 import os
 import base64
 
+import librosa
 import numpy as np
 import pandas as pd
 import panel as pn
 import soundfile as sf
+import scipy.fft as fft
 
 from scipy.io import wavfile
 
@@ -18,29 +20,106 @@ from bokeh.layouts import column, row, Spacer
 
 file_input = pn.widgets.FileInput(
     accept=".txt,.csv,.wav", width=200, margin=(70, 0, 10, 10))
+
+
 modes = pn.widgets.Select(name='modes', options=[
                           'default', 'music', 'vocals'], width=400)
 
 
 info_msg = pn.pane.Alert("""<h1 style="font-size: 50px; color: #242020;">Upload a file and start mixing <br> <span style="font-size: 30px; color: grey;">&lpar;only *.csv and *.wav files&rpar;</span></h1>""",
-                         alert_type="dark", width=1200, height=400, margin=(0, 50, 0, 130))
+                         alert_type="dark", width=800, height=400, margin=(0, 50, 0, 130))
 
 
 input_source = ColumnDataSource(pd.DataFrame())
+output_source = ColumnDataSource(pd.DataFrame())
 
-input_graph = figure(height=400, width=1200,
-                     tools="crosshair,pan,reset,save,wheel_zoom", title="Input Graph")
+hover_tools = [
+    ("(time,amp)", "($x, $y)")
+]
+
+input_graph = figure(height=280, width=800,
+                     tools="crosshair,pan,reset,save,wheel_zoom", title="Input Graph", tooltips=hover_tools)
 
 input_graph.line(x="time", y="amp", source=input_source,
                  line_width=3, line_alpha=0.6)
 
 input_graph.visible = False
 
+
+output_graph = figure(height=280, width=800,
+                      tools="crosshair,pan,reset,save,wheel_zoom", title="Output Graph", tooltips=hover_tools, x_range=input_graph.x_range, y_range=input_graph.y_range)
+
+output_graph.line(x="time", y="amp", source=output_source,
+                  line_width=3, line_alpha=0.6, color="firebrick")
+
+output_graph.visible = False
+
+default_sliders_values = [0] * 10
+music_sliders_values = [0] * 10
+vocals_sliders_values = [0] * 10
+
+slider1 = Slider(title="20Hz - 40Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider2 = Slider(title="40Hz - 80Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider3 = Slider(title="80Hz - 160Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider4 = Slider(title="160Hz - 320Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider5 = Slider(title="320Hz - 640Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider6 = Slider(title="640Hz - 1280Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider7 = Slider(title="1280Hz - 2560Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider8 = Slider(title="2560Hz - 5120Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider9 = Slider(title="5120Hz - 10024Hz", value=0.0,
+                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+slider10 = Slider(title="10024Hz - 20000Hz", value=0.0,
+                  start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+
+
 input_audio = pn.pane.Audio(name='Input Audio')
 input_audio.visible = False
 
 input_audio_label = pn.Row("####Input Audio", margin=(12, 0, 0, 0))
 input_audio_label.visible = False
+
+
+output_audio = pn.pane.Audio(name='Output Audio')
+output_audio.visible = False
+
+output_audio_label = pn.Row("####Output Audio", margin=(12, 0, 0, 0))
+output_audio_label.visible = False
+
+
+def activate_sliders(flag):
+    if flag == True:
+        slider1.disabled = False
+        slider2.disabled = False
+        slider3.disabled = False
+        slider4.disabled = False
+        slider5.disabled = False
+        slider6.disabled = False
+        slider7.disabled = False
+        slider8.disabled = False
+        slider9.disabled = False
+        slider10.disabled = False
+    else:
+        slider1.disabled = True
+        slider2.disabled = True
+        slider3.disabled = True
+        slider4.disabled = True
+        slider5.disabled = True
+        slider6.disabled = True
+        slider7.disabled = True
+        slider8.disabled = True
+        slider9.disabled = True
+        slider10.disabled = True
+
+
+activate_sliders(False)
 
 
 def file_input_callback(*events):
@@ -57,11 +136,19 @@ def file_handler(type):
 
     if type == "wav":
         file_input.save("input.wav")
+        file_input.save("output.wav")
     elif type == "csv":
         if os.path.exists("input.csv"):
             os.remove("input.csv")
 
+        if os.path.exists("output.csv"):
+            os.remove("output.csv")
+
         csv_file = open("input.csv", "w")
+        csv_file.write(file_input.value.decode("utf-8"))
+        csv_file.close()
+
+        csv_file = open("output.csv", "w")
         csv_file.write(file_input.value.decode("utf-8"))
         csv_file.close()
 
@@ -75,34 +162,72 @@ def graph_visibility(flag):
         input_graph.visible = True
         input_audio.visible = True
         input_audio_label.visible = True
+        output_graph.visible = True
+        output_audio.visible = True
+        output_audio_label.visible = True
 
     else:
         info_msg.visible = True
         input_graph.visible = False
         input_audio.visible = False
         input_audio_label.visible = False
+        output_graph.visible = False
+        output_audio.visible = False
+        output_audio_label.visible = False
 
 
 def plot_input(type):
     if type == "wav":
+
         fs, data = wavfile.read("input.wav")
+
         n_samples = len(data)
         time = np.linspace(0, n_samples/fs, num=n_samples)
+
+        # data, fs =  librosa.load("input.wav")
+
+        # MAX = data.max()
+
+        # # data = data + MAX
+
+        # data = librosa.amplitude_to_db(S=data)
+        # # data = librosa.db_to_amplitude(S_db=data)
+
+        # # data = data - MAX
+
+        # data_fft = fft.rfft(data)
+
+        # data = np.divide(np.abs(data_fft), data.size)
+        
+        
+        # data = np.abs(data_fft)
+
+        # time = fft.rfftfreq(n=n_samples, d=1.0/fs)
+
+        # data = fft.irfft(data_fft)
+
+        # time = data_time
+
         df = pd.DataFrame(data={
             "time": time,
             "amp": data
         })
 
+        df.astype(float)
+
+        # df.to_csv("dow.csv", index=False)
+
+        # print(df["amp"].max())
+
+        # df["amp"] = df["amp"].add(df["amp"].max())
+
         input_source.data = df
-
-
-        if os.path.exists("dow.csv"):
-            os.remove("dow.csv")
-            
-        df.to_csv("dow.csv", encoding='utf-8', index=False)
+        output_source.data = df
 
         input_audio.object = "input.wav"
+        output_audio.object = "output.wav"
 
+        activate_sliders(True)
         graph_visibility(True)
 
     elif type == "csv":
@@ -110,30 +235,61 @@ def plot_input(type):
         csv_df.columns = ["time", "amp"]
 
         csv_df = csv_df.astype(float)
-        
+
+        # csv_df["amp"] = librosa.amplitude_to_db(S=csv_df["amp"].to_numpy(), ref=1)
+        # csv_df["amp"] = librosa.db_to_amplitude(S_db=csv_df["amp"].to_numpy(), ref=1)
+
+        # data = csv_df["amp"].values
+
+        # times = csv_df["time"].values
+        # n_measurements = len(times)
+        # timespan_seconds = times[-1] - times[0]
+        # sample_rate_hz = int(n_measurements / timespan_seconds)
+
+        # n_samples = len(data)
+
+        # data_time = np.linspace(0, n_samples/sample_rate_hz, num=n_samples)
+
+        # data_fft = fft.rfft(data)
+
+        # data = np.abs(data_fft)*2 / n_samples
+
+        # time = fft.rfftfreq(n=n_samples, d=1.0/sample_rate_hz)
+
+        # csv_df = pd.DataFrame(data={
+        #     "time": time,
+        #     "amp": data
+        # })
+
         input_source.data = csv_df
+        output_source.data = csv_df
 
         times = csv_df["time"].values
         n_measurements = len(times)
         timespan_seconds = times[-1] - times[0]
         sample_rate_hz = int(n_measurements / timespan_seconds)
 
-        # print("fs:", sample_rate_hz)
-        data = csv_df["amp"].values
+        data = csv_df["amp"].divide(32767).values
 
-        # csv_df.info()
-        
         if os.path.exists("input.wav"):
             os.remove("input.wav")
 
+        if os.path.exists("output.wav"):
+            os.remove("output.wav")
+
         sf.write("input.wav", data, sample_rate_hz)
+        sf.write("output.wav", data, sample_rate_hz)
 
         input_audio.object = "input.wav"
+        output_audio.object = "output.wav"
 
         graph_visibility(True)
+        activate_sliders(True)
 
     else:
         graph_visibility(False)
+        activate_sliders(False)
+
         return
 
 
@@ -145,14 +301,25 @@ file_input.jslink(input_audio, value="object")
 in_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
     input_graph), Spacer(width=50)))
 
+out_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
+    output_graph), Spacer(width=50)))
+
 in_audio_layout = pn.Row(
     input_audio_label, input_audio, margin=(15, 0, 15, 150))
 
-visual_sec = pn.Column(info_msg, in_graph_layout, in_audio_layout)
+out_audio_layout = pn.Row(
+    output_audio_label, output_audio, margin=(15, 0, 15, 150))
+
+
+visual_sec = pn.Column(info_msg, in_graph_layout,
+                       in_audio_layout, out_graph_layout, out_audio_layout)
 
 # visual_sec.visible = False
 
-app = pn.Row(visual_sec, pn.Column(file_input, modes))
+sliders = pn.pane.Bokeh(column(slider1, slider2, slider3, slider4, slider5,
+                               slider6, slider7, slider8, slider9, slider10), width=400, margin=(0, 0, 0, 5))
+
+app = pn.Row(visual_sec, pn.Column(file_input, modes, sliders))
 
 
 app.servable()
