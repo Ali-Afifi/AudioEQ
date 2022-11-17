@@ -6,15 +6,16 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import soundfile as sf
-import scipy.fft as fft
 
 from scipy.io import wavfile
+from scipy.fft import rfftfreq, rfft, irfft
 
 
 from panel.interact import interact
 
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, Slider, Button, Select, CustomJS, Div
+from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.layouts import column, row, Spacer
 
 
@@ -58,26 +59,30 @@ default_sliders_values = [0] * 10
 music_sliders_values = [0] * 10
 vocals_sliders_values = [0] * 10
 
-slider1 = Slider(title="20Hz - 40Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider2 = Slider(title="40Hz - 80Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider3 = Slider(title="80Hz - 160Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider4 = Slider(title="160Hz - 320Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider5 = Slider(title="320Hz - 640Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider6 = Slider(title="640Hz - 1280Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider7 = Slider(title="1280Hz - 2560Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider8 = Slider(title="2560Hz - 5120Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider9 = Slider(title="5120Hz - 10024Hz", value=0.0,
-                 start=-20.0, end=20.0, step=1.0, format="@value{dB}")
-slider10 = Slider(title="10024Hz - 20000Hz", value=0.0,
-                  start=-20.0, end=20.0, step=1.0, format="@value{dB}")
+# slider1 = Slider(title="20Hz - 40Hz", value=0.0,
+#                  start=-20.0, end=20.0, step=0.1, format="@[.] {dB}")
+
+
+slider1 = pn.widgets.FloatSlider(name="20Hz - 40Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider2 = pn.widgets.FloatSlider(name="40Hz - 80Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider3 = pn.widgets.FloatSlider(name="80Hz - 160Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider4 = pn.widgets.FloatSlider(name="160Hz - 320Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider5 = pn.widgets.FloatSlider(name="320Hz - 640Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider6 = pn.widgets.FloatSlider(name="640Hz - 1280Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider7 = pn.widgets.FloatSlider(name="1280Hz - 2560Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider8 = pn.widgets.FloatSlider(name="2560Hz - 5120Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider9 = pn.widgets.FloatSlider(name="5120Hz - 10024Hz", value=0.0,
+                                 start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
+slider10 = pn.widgets.FloatSlider(name="10024Hz - 20000Hz", value=0.0,
+                                  start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
 
 
 input_audio = pn.pane.Audio(name='Input Audio')
@@ -188,18 +193,14 @@ def plot_input(type):
 
         # MAX = data.max()
 
-        # # data = data + MAX
+        # data = data + MAX
 
-        # data = librosa.amplitude_to_db(S=data)
-        # # data = librosa.db_to_amplitude(S_db=data)
-
-        # # data = data - MAX
+        # data = data - MAX
 
         # data_fft = fft.rfft(data)
 
         # data = np.divide(np.abs(data_fft), data.size)
-        
-        
+
         # data = np.abs(data_fft)
 
         # time = fft.rfftfreq(n=n_samples, d=1.0/fs)
@@ -207,6 +208,9 @@ def plot_input(type):
         # data = fft.irfft(data_fft)
 
         # time = data_time
+
+        # data = librosa.amplitude_to_db(S=data)
+        # data = librosa.db_to_amplitude(S_db=data)
 
         df = pd.DataFrame(data={
             "time": time,
@@ -290,12 +294,104 @@ def plot_input(type):
         graph_visibility(False)
         activate_sliders(False)
 
-        return
 
+def update_output_audio():
+    amp = input_source.data["amp"]
+    time = input_source.data["time"]
+
+    n_measurements = len(amp)
+    timespan_seconds = time[-1] - time[0]
+    fs = int(n_measurements / timespan_seconds)
+
+    data = amp/(32767)
+
+    if os.path.exists("output.wav"):
+        os.remove("output.wav")
+
+    sf.write("output.wav", data, fs)
+
+    output_audio.object = "output.wav"
+
+
+def adding_gain(begin, finish, coef):
+    amp = input_source.data["amp"].tolist()
+    time = input_source.data["time"]
+
+    n_samples = len(amp)
+    timespan_seconds = time[-1] - time[0]
+
+    fs = int(n_samples / timespan_seconds)
+
+    data_fft = rfft(amp).tolist()
+
+    # abs_data_fft = np.abs(data_fft)
+    freq = rfftfreq(n=n_samples, d=1.0/fs).tolist()
+
+    start = freq.index(begin)
+    end = freq.index(finish)
+
+    # print(start, end)
+
+    print(max(freq))
+
+    band = data_fft[start:end + 1]
+
+    updated_band = [coef * i for i in band]
+
+    data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
+
+    output_source.data = pd.DataFrame(data={
+        "time": time,
+        "amp": irfft(data_fft)
+    })
+
+    update_output_audio()
+
+
+def update_data_source():
+
+    for i, value in enumerate(default_sliders_values):
+
+        coef = 10**(value/20)
+
+        # if i == 0:
+        #     # adding_gain(19.970472013548132, 40.76164835642017, coef)
+        #     adding_gain(20, 40, coef)
+        # elif i == 1:
+        #     adding_gain(41, 80, coef)
+        # elif i == 2:
+        #     adding_gain(81, 160, coef)
+        # elif i == 3:
+        if i == 3:
+            adding_gain(161, 320, coef)
+        # elif i == 4:
+        #     adding_gain(321, 640, coef)
+        # elif i == 5:
+        #     adding_gain(641, 1280, coef)
+        # elif i == 6:
+        #     adding_gain(1281, 2560, coef)
+        # elif i == 7:
+        #     adding_gain(2561, 5120, coef)
+        # elif i == 8:
+        #     adding_gain(5121, 10240, coef)
+        # elif i == 9:
+        #     adding_gain(10241, 20000, coef)
+
+
+def update_sliders_value(attrname, old, new):
+    for i, s in enumerate([slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]):
+        default_sliders_values[i] = np.round(s.value, 3)
+        # s.js_link(output_audio, value="object")
+    update_data_source()
+
+
+# for s in [slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]:
+#     s.on_change("value", update_sliders_value)
 
 file_input.param.watch(file_input_callback, "filename")
 
 file_input.jslink(input_audio, value="object")
+file_input.jslink(output_audio, value="object")
 
 
 in_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
@@ -316,10 +412,13 @@ visual_sec = pn.Column(info_msg, in_graph_layout,
 
 # visual_sec.visible = False
 
-sliders = pn.pane.Bokeh(column(slider1, slider2, slider3, slider4, slider5,
-                               slider6, slider7, slider8, slider9, slider10), width=400, margin=(0, 0, 0, 5))
+# sliders = pn.pane.Bokeh(column(slider1, slider2, slider3, slider4, slider5,
+#                                slider6, slider7, slider8, slider9, slider10), width=400, margin=(0, 0, 0, 5))
+
+
+sliders = pn.Column(slider1, slider2, slider3, slider4, slider5,
+                    slider6, slider7, slider8, slider9, slider10, width=400, margin=(0, 0, 0, 5))
 
 app = pn.Row(visual_sec, pn.Column(file_input, modes, sliders))
-
 
 app.servable()
