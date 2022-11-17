@@ -295,9 +295,9 @@ def plot_input(type):
         activate_sliders(False)
 
 
-def update_output_audio():
-    amp = input_source.data["amp"]
-    time = input_source.data["time"]
+def update_output_audio(*events):
+    amp = output_source.data["amp"]
+    time = output_source.data["time"]
 
     n_measurements = len(amp)
     timespan_seconds = time[-1] - time[0]
@@ -314,8 +314,8 @@ def update_output_audio():
 
 
 def adding_gain(begin, finish, coef):
-    amp = input_source.data["amp"].tolist()
-    time = input_source.data["time"]
+    amp = output_source.data["amp"].tolist()
+    time = output_source.data["time"]
 
     n_samples = len(amp)
     timespan_seconds = time[-1] - time[0]
@@ -339,13 +339,30 @@ def adding_gain(begin, finish, coef):
     updated_band = [coef * i for i in band]
 
     data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
+    
+    data = irfft(data_fft)
 
     output_source.data = pd.DataFrame(data={
         "time": time,
-        "amp": irfft(data_fft)
+        "amp": data
     })
 
-    update_output_audio()
+    # update_output_audio()
+    
+
+    n_measurements = len(data)
+    timespan_seconds = time[-1] - time[0]
+    fs = int(n_measurements / timespan_seconds)
+
+    data = data/(32767)
+
+    if os.path.exists("output.wav"):
+        os.remove("output.wav")
+
+    sf.write("output.wav", data, fs)
+
+    output_audio.object = "output.wav"
+
 
 
 def update_data_source():
@@ -354,45 +371,56 @@ def update_data_source():
 
         coef = 10**(value/20)
 
-        # if i == 0:
-        #     # adding_gain(19.970472013548132, 40.76164835642017, coef)
-        #     adding_gain(20, 40, coef)
-        # elif i == 1:
-        #     adding_gain(41, 80, coef)
-        # elif i == 2:
-        #     adding_gain(81, 160, coef)
-        # elif i == 3:
-        if i == 3:
+        if i == 0:
+            # adding_gain(19.970472013548132, 40.76164835642017, coef)
+            adding_gain(20, 40, coef)
+        elif i == 1:
+            adding_gain(41, 80, coef)
+        elif i == 2:
+            adding_gain(81, 160, coef)
+        elif i == 3:
+        # if i == 3:
             adding_gain(161, 320, coef)
-        # elif i == 4:
-        #     adding_gain(321, 640, coef)
-        # elif i == 5:
-        #     adding_gain(641, 1280, coef)
-        # elif i == 6:
-        #     adding_gain(1281, 2560, coef)
-        # elif i == 7:
-        #     adding_gain(2561, 5120, coef)
-        # elif i == 8:
-        #     adding_gain(5121, 10240, coef)
+        elif i == 4:
+            adding_gain(321, 640, coef)
+        elif i == 5:
+            adding_gain(641, 1280, coef)
+        elif i == 6:
+            adding_gain(1281, 2560, coef)
+        elif i == 7:
+            adding_gain(2561, 5120, coef)
+        elif i == 8:
+            adding_gain(5121, 10240, coef)
         # elif i == 9:
         #     adding_gain(10241, 20000, coef)
 
 
-def update_sliders_value(attrname, old, new):
+def update_sliders_value(*events):
     for i, s in enumerate([slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]):
         default_sliders_values[i] = np.round(s.value, 3)
         # s.js_link(output_audio, value="object")
     update_data_source()
 
 
-# for s in [slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]:
-#     s.on_change("value", update_sliders_value)
+for s in [slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]:
+    # s.on_change("value", update_sliders_value)
+    s.param.watch(update_sliders_value, "value")
+    s.jslink(output_graph, value="source")
+    # s.jslink(output_audio)
+
+
+
+# output_audio.jscallback(args={
+#     "source": output_audio.object
+# })
+
+
 
 file_input.param.watch(file_input_callback, "filename")
 
+
 file_input.jslink(input_audio, value="object")
 file_input.jslink(output_audio, value="object")
-
 
 in_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
     input_graph), Spacer(width=50)))
