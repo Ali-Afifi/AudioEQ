@@ -7,3 +7,4 @@ soundfile
 panel==0.14.1
 hvplot
 librosa
+ipympl

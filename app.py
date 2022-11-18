@@ -19,17 +19,23 @@ from bokeh.models import ColumnDataSource, Slider, Button, Select, CustomJS, Div
 from bokeh.models.formatters import PrintfTickFormatter
 from bokeh.layouts import column, row, Spacer
 
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+
+# pn.extension('ipywidgets')
+
+
 
 file_input = pn.widgets.FileInput(
     accept=".txt,.csv,.wav", width=200, margin=(70, 0, 10, 10))
 
 
 modes = pn.widgets.Select(name='modes', options=[
-                          'default', 'music', 'vocals'], width=400)
+                          'default', 'music', 'vocals'], width=380)
 
 
 info_msg = pn.pane.Alert("""<h1 style="font-size: 50px; color: #242020;">Upload a file and start mixing <br> <span style="font-size: 30px; color: grey;">&lpar;only *.csv and *.wav files&rpar;</span></h1>""",
-                         alert_type="dark", width=800, height=400, margin=(0, 50, 0, 130))
+                         alert_type="dark", width=1000, height=400, margin=(0, 0, 0, 0), sizing_mode='stretch_width')
 
 
 input_source = ColumnDataSource(pd.DataFrame())
@@ -40,7 +46,7 @@ hover_tools = [
     ("(time,amp)", "($x, $y)")
 ]
 
-input_graph = figure(height=280, width=800,
+input_graph = figure(height=280, width=1000,
                      tools="crosshair,pan,reset,save,wheel_zoom", title="Input Graph", tooltips=hover_tools)
 
 input_graph.line(x="time", y="amp", source=input_source,
@@ -49,7 +55,7 @@ input_graph.line(x="time", y="amp", source=input_source,
 input_graph.visible = False
 
 
-output_graph = figure(height=280, width=800,
+output_graph = figure(height=280, width=1000,
                       tools="crosshair,pan,reset,save,wheel_zoom", title="Output Graph", tooltips=hover_tools, x_range=input_graph.x_range, y_range=input_graph.y_range)
 
 output_graph.line(x="time", y="amp", source=output_source,
@@ -86,8 +92,13 @@ slider9 = pn.widgets.FloatSlider(name="5120Hz - 10024Hz", value=0.0,
 slider10 = pn.widgets.FloatSlider(name="10024Hz - 20000Hz", value=0.0,
                                   start=-20.0, end=20.0, step=0.1, format=PrintfTickFormatter(format='%.2f dB'))
 
+
 reset_sliders = pn.widgets.Button(
-    name='Reset', button_type='primary', width=400)
+    name='Reset', button_type='primary', width=380)
+
+toggle_spectrograms = pn.widgets.Toggle(
+    name='Show spectrograms', button_type='success', width=380)
+
 
 input_audio = pn.pane.Audio(name='Input Audio')
 input_audio.visible = False
@@ -101,6 +112,11 @@ output_audio.visible = False
 
 output_audio_label = pn.Row("####Output Audio", margin=(12, 0, 0, 0))
 output_audio_label.visible = False
+
+input_spectrogram = pn.pane.Matplotlib(
+    object=plt.figure())
+output_spectrogram = pn.pane.Matplotlib(
+    object=plt.figure(), tight=True, width=1000)
 
 
 def activate_sliders(flag):
@@ -117,6 +133,7 @@ def activate_sliders(flag):
         slider10.disabled = False
 
         reset_sliders.disabled = False
+        toggle_spectrograms.disabled = False
 
     else:
         slider1.disabled = True
@@ -131,6 +148,7 @@ def activate_sliders(flag):
         slider10.disabled = True
 
         reset_sliders.disabled = True
+        toggle_spectrograms.disabled = True
 
 
 def flatten_sliders():
@@ -144,7 +162,6 @@ def flatten_sliders():
     slider8.value = 0
     slider9.value = 0
     slider10.value = 0
-                
 
 
 activate_sliders(False)
@@ -158,11 +175,12 @@ def file_input_callback(*events):
 
     file_handler(type)
     plot_input(type)
+    flatten_sliders()
+    
 
 
 def file_handler(type):
-    flatten_sliders()
- 
+
     if type == "wav":
         file_input.save("input.wav")
         file_input.save("output.wav")
@@ -206,7 +224,7 @@ def graph_visibility(flag):
 
 
 def plot_input(type):
-    
+
     if type == "wav":
 
         fs, data = wavfile.read("input.wav")
@@ -252,6 +270,21 @@ def plot_input(type):
 
         input_source.data = df
         output_source.data = df
+
+
+        plt.specgram(data, Fs=fs, NFFT=1024)
+
+        plt.colorbar()
+
+        plt.ylabel('Frequency [Hz]')
+        plt.xlabel('Time [Sec]')
+
+        # plt.show()
+        fig = plt.figure()
+
+        input_spectrogram.object = fig
+        output_spectrogram.object = fig
+
 
         input_audio.object = "input.wav"
         output_audio.object = "output.wav"
@@ -321,6 +354,8 @@ def plot_input(type):
 
 
 def update_output_audio(*events):
+    
+    
     amp = output_source.data["amp"]
     time = output_source.data["time"]
 
@@ -335,12 +370,17 @@ def update_output_audio(*events):
 
     sf.write("output.wav", data, fs)
 
+    # output_audio.object = "output.wav"
+
     output_audio.object = data
     output_audio.sample_rate = fs
+    
+    print(output_audio.volume)
+    print(output_audio.object)
 
 
 # def adding_gain(begin, finish, coef):
-    
+
 #     amp = input_source.data["amp"].tolist()
 #     time = input_source.data["time"]
 
@@ -366,7 +406,7 @@ def update_output_audio(*events):
 #     updated_band = [coef * i for i in band]
 
 #     data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
-    
+
 #     data = irfft(data_fft)
 
 #     # updated_output_source.data = pd.DataFrame(data={
@@ -375,7 +415,6 @@ def update_output_audio(*events):
 #     # })
 
 #     # update_output_audio()
-    
 
     # n_measurements = len(data)
     # timespan_seconds = time[-1] - time[0]
@@ -389,7 +428,6 @@ def update_output_audio(*events):
     # sf.write("output.wav", data, fs)
 
     # output_audio.object = "output.wav"
-
 
 
 def update_data_source():
@@ -410,7 +448,7 @@ def update_data_source():
     # updated_band = [coef * i for i in band]
 
     # data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
-    
+
     # print(fs, n_samples)
 
     for i, value in enumerate(default_sliders_values):
@@ -422,17 +460,16 @@ def update_data_source():
             # adding_gain(20, 40, coef)
             start = freq.index(20)
             end = freq.index(40)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
 
-            
         elif i == 1:
             # adding_gain(41, 80, coef)
             start = freq.index(41)
             end = freq.index(80)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -441,7 +478,7 @@ def update_data_source():
             # adding_gain(81, 160, coef)
             start = freq.index(81)
             end = freq.index(160)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -450,16 +487,16 @@ def update_data_source():
             # adding_gain(161, 320, coef)
             start = freq.index(161)
             end = freq.index(320)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
-            
+
         elif i == 4:
             # adding_gain(321, 640, coef)
             start = freq.index(321)
             end = freq.index(640)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -467,7 +504,7 @@ def update_data_source():
             # adding_gain(641, 1280, coef)
             start = freq.index(641)
             end = freq.index(1280)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -475,7 +512,7 @@ def update_data_source():
             # adding_gain(1281, 2560, coef)
             start = freq.index(1281)
             end = freq.index(2560)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -483,7 +520,7 @@ def update_data_source():
             # adding_gain(2561, 5120, coef)
             start = freq.index(2561)
             end = freq.index(5120)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -491,7 +528,7 @@ def update_data_source():
             # adding_gain(5121, 10240, coef)
             start = freq.index(5121)
             end = freq.index(10240)
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
@@ -500,48 +537,39 @@ def update_data_source():
             start = freq.index(10241)
             try:
                 end = freq.index(20000)
-                
+
             except ValueError:
                 end = freq.index(max(freq))
-                
+
             if end < start:
                 tmp = start
                 start = end
                 end = tmp
-            
+
             band = data_fft[start:end + 1]
             updated_band = [coef * i for i in band]
             data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
-    
-    
+
     data = irfft(data_fft)
-    
-    
+
     output_source.data = pd.DataFrame(data={
         "time": time,
         "amp": data
     })
-    
+
     data = data/(32767)
 
-    # print(int(len(data) / timespan_seconds), len(data))
 
-    if os.path.exists("output.wav"):
-        os.remove("output.wav")
-
-    sf.write("output.wav", data, fs)
-
-    random_number = random.randint(80,100)
+    random_number = random.randint(90, 100)
     
-    if random_number == output_audio.volume:
-        random_number = random.randint(80,100)
-    else:
-        output_audio.volume = random_number
-    
+
+    while random_number == output_audio.volume:
+        random_number = random.randint(90, 100)
+
+    output_audio.volume = random_number
+
     output_audio.object = "output.wav"
-    
-    # output_audio.object = data
-    # output_audio.sample_rate = fs
+
 
 
 def update_sliders_value(*events):
@@ -553,17 +581,16 @@ def update_sliders_value(*events):
 for s in [slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]:
     s.param.watch(update_sliders_value, "value")
     s.jslink(output_graph, value="source")
-    # s.jslink(output_audio, )
 
-
-
-# output_audio.jscallback(args={
-#     "source": output_audio.object
-# })
 
 def flatten_callback(event):
-   flatten_sliders() 
-   
+    flatten_sliders()
+
+
+def toggle_spectrograms_callback(*events):
+    print(toggle_spectrograms.value)
+    # visual_sec.append(pn.Column)
+
 
 file_input.param.watch(file_input_callback, "filename")
 
@@ -575,31 +602,36 @@ reset_sliders.on_click(flatten_callback)
 
 output_audio.param.watch(update_output_audio, "volume")
 
-in_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
-    input_graph), Spacer(width=50)))
+toggle_spectrograms.param.watch(toggle_spectrograms_callback, "value")
 
-out_graph_layout = pn.pane.Bokeh(row(Spacer(width=130), column(
-    output_graph), Spacer(width=50)))
+
+
+
+
+in_graph_layout = pn.pane.Bokeh(row(column(
+    input_graph)))
+
+out_graph_layout = pn.pane.Bokeh(row(column(
+    output_graph)))
+
 
 in_audio_layout = pn.Row(
-    input_audio_label, input_audio, margin=(15, 0, 15, 150))
+    input_audio_label, input_audio, margin=(15, 0, 15, 50))
 
 out_audio_layout = pn.Row(
-    output_audio_label, output_audio, margin=(15, 0, 15, 150))
+    output_audio_label, output_audio, margin=(15, 0, 15, 50))
 
 
 visual_sec = pn.Column(info_msg, in_graph_layout,
-                       in_audio_layout, out_graph_layout, out_audio_layout)
+                       in_audio_layout, out_graph_layout, out_audio_layout, input_spectrogram, output_spectrogram, margin=(15, 0, 0, 0))
 
 # visual_sec.visible = False
 
-# sliders = pn.pane.Bokeh(column(slider1, slider2, slider3, slider4, slider5,
-#                                slider6, slider7, slider8, slider9, slider10), width=400, margin=(0, 0, 0, 5))
 
+sliders = pn.Column(reset_sliders, slider1, slider2, slider3, slider4, slider5,
+                    slider6, slider7, slider8, slider9, slider10, toggle_spectrograms, width=400, margin=(0, 0, 0, 5))
 
-sliders = pn.Column(reset_sliders,slider1, slider2, slider3, slider4, slider5,
-                    slider6, slider7, slider8, slider9, slider10, width=400, margin=(0, 0, 0, 5))
-
-app = pn.Row(visual_sec, pn.Column(file_input, modes, sliders))
+app = pn.Row(pn.layout.HSpacer(), visual_sec, pn.layout.HSpacer(),
+             pn.Column(file_input, modes, sliders), pn.layout.HSpacer())
 
 app.servable()
