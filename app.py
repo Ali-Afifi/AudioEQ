@@ -11,6 +11,7 @@ import soundfile as sf
 from scipy.io import wavfile
 from scipy.fft import rfftfreq, rfft, irfft
 
+import scipy.signal
 
 from panel.interact import interact
 
@@ -114,9 +115,12 @@ output_audio_label = pn.Row("####Output Audio", margin=(12, 0, 0, 0))
 output_audio_label.visible = False
 
 input_spectrogram = pn.pane.Matplotlib(
-    object=plt.figure())
+    object=Figure(),tight= True)
 output_spectrogram = pn.pane.Matplotlib(
-    object=plt.figure(), tight=True, width=1000)
+    object=Figure(), tight= True)
+
+input_spectrogram.visible = False
+output_spectrogram.visible = False
 
 
 def activate_sliders(flag):
@@ -272,18 +276,26 @@ def plot_input(type):
         output_source.data = df
 
 
-        plt.specgram(data, Fs=fs, NFFT=1024)
+        # plt.specgram(data, Fs=fs, NFFT=1024)
 
-        plt.colorbar()
+        # plt.colorbar()
 
-        plt.ylabel('Frequency [Hz]')
-        plt.xlabel('Time [Sec]')
+        # plt.ylabel('Frequency [Hz]')
+        # plt.xlabel('Time [Sec]')
 
-        # plt.show()
-        fig = plt.figure()
+        # # plt.show()
+        # fig = plt.figure()
+        # plt.close()
 
-        input_spectrogram.object = fig
-        output_spectrogram.object = fig
+        print("before:",input_spectrogram.dpi)
+        print("before:",output_spectrogram.dpi)
+
+        
+        input_spectrogram.dpi = 143
+        output_spectrogram.dpi = 143
+
+        # input_spectrogram.object = fig
+        # output_spectrogram.object = fig
 
 
         input_audio.object = "input.wav"
@@ -589,7 +601,53 @@ def flatten_callback(event):
 
 def toggle_spectrograms_callback(*events):
     print(toggle_spectrograms.value)
-    # visual_sec.append(pn.Column)
+    if toggle_spectrograms.value == True:
+        input_spectrogram.visible = True
+        output_spectrogram.visible = True
+    else:
+        input_spectrogram.visible = False
+        output_spectrogram.visible = False
+
+        
+        
+def update_spectrograms(*events):
+    data = input_source.data["amp"].tolist()
+    time = input_source.data["time"]
+    
+    n_samples = len(time)
+    timespan_seconds = time[-1] - time[0]
+
+    fs = int(n_samples / timespan_seconds)
+
+    fig = Figure()
+    
+    ax = fig.subplots()
+    
+    ax.specgram(data, Fs=fs, NFFT=1024)
+    
+    # fig.colorbar(ax=ax)
+    
+    # plt.specgram(data, Fs=fs, NFFT=1024)
+    # plt.colorbar()
+    # plt.ylabel('Frequency [Hz]')
+    # plt.xlabel('Time [Sec]')
+
+    # # plt.show()
+    # fig = plt.figure()
+
+    input_spectrogram.object = fig
+    output_spectrogram.object = fig
+
+    # plt.close()
+    
+    # input_spectrogram._update_pane()
+    # output_spectrogram._update_pane()
+
+    print(input_spectrogram.dpi)
+    print(output_spectrogram.dpi)
+    print(input_spectrogram.object)
+    print(output_spectrogram.object)
+
 
 
 file_input.param.watch(file_input_callback, "filename")
@@ -604,7 +662,8 @@ output_audio.param.watch(update_output_audio, "volume")
 
 toggle_spectrograms.param.watch(toggle_spectrograms_callback, "value")
 
-
+# input_spectrogram.param.watch(update_spectrograms, "dpi")
+output_spectrogram.param.watch(update_spectrograms, "dpi")
 
 
 
@@ -621,9 +680,10 @@ in_audio_layout = pn.Row(
 out_audio_layout = pn.Row(
     output_audio_label, output_audio, margin=(15, 0, 15, 50))
 
+spectrograms_layout = pn.Row(input_spectrogram, output_spectrogram)
 
 visual_sec = pn.Column(info_msg, in_graph_layout,
-                       in_audio_layout, out_graph_layout, out_audio_layout, input_spectrogram, output_spectrogram, margin=(15, 0, 0, 0))
+                       in_audio_layout, out_graph_layout, out_audio_layout, spectrograms_layout, margin=(15, 0, 0, 0))
 
 # visual_sec.visible = False
 
@@ -634,4 +694,4 @@ sliders = pn.Column(reset_sliders, slider1, slider2, slider3, slider4, slider5,
 app = pn.Row(pn.layout.HSpacer(), visual_sec, pn.layout.HSpacer(),
              pn.Column(file_input, modes, sliders), pn.layout.HSpacer())
 
-app.servable()
+app.servable(title="Equalizer")
