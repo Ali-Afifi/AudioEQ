@@ -22,13 +22,14 @@ from bokeh.layouts import column, row, Spacer
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib import cm
+from matplotlib.colors import Normalize
 
 # pn.extension('ipywidgets')
 
 
-
 file_input = pn.widgets.FileInput(
-    accept=".txt,.csv,.wav", width=200, margin=(70, 0, 10, 10))
+    accept=".txt,.csv,.wav", width=200, margin=(30, 0, 10, 10))
 
 
 modes = pn.widgets.Select(name='modes', options=[
@@ -114,10 +115,18 @@ output_audio.visible = False
 output_audio_label = pn.Row("####Output Audio", margin=(12, 0, 0, 0))
 output_audio_label.visible = False
 
-input_spectrogram = pn.pane.Matplotlib(
-    object=Figure(),tight= True)
-output_spectrogram = pn.pane.Matplotlib(
-    object=Figure(), tight= True)
+
+input_spectrogram_label = pn.Row(
+    "#### Input Spectrogram", margin=(0,0,0,50))
+output_spectrogram_label = pn.Row(
+    "#### Output Spectrogram", margin=(0,0,0,50))
+
+
+input_spectrogram_label.visible = False
+output_spectrogram_label.visible = False
+
+input_spectrogram = pn.pane.Matplotlib(object=Figure(), tight=True)
+output_spectrogram = pn.pane.Matplotlib(object=Figure(), tight=True)
 
 input_spectrogram.visible = False
 output_spectrogram.visible = False
@@ -180,7 +189,6 @@ def file_input_callback(*events):
     file_handler(type)
     plot_input(type)
     flatten_sliders()
-    
 
 
 def file_handler(type):
@@ -275,7 +283,6 @@ def plot_input(type):
         input_source.data = df
         output_source.data = df
 
-
         # plt.specgram(data, Fs=fs, NFFT=1024)
 
         # plt.colorbar()
@@ -287,16 +294,14 @@ def plot_input(type):
         # fig = plt.figure()
         # plt.close()
 
-        print("before:",input_spectrogram.dpi)
-        print("before:",output_spectrogram.dpi)
+        print("before:", input_spectrogram.dpi)
+        print("before:", output_spectrogram.dpi)
 
-        
         input_spectrogram.dpi = 143
         output_spectrogram.dpi = 143
 
         # input_spectrogram.object = fig
         # output_spectrogram.object = fig
-
 
         input_audio.object = "input.wav"
         output_audio.object = "output.wav"
@@ -366,8 +371,7 @@ def plot_input(type):
 
 
 def update_output_audio(*events):
-    
-    
+
     amp = output_source.data["amp"]
     time = output_source.data["time"]
 
@@ -386,7 +390,7 @@ def update_output_audio(*events):
 
     output_audio.object = data
     output_audio.sample_rate = fs
-    
+
     print(output_audio.volume)
     print(output_audio.object)
 
@@ -571,9 +575,7 @@ def update_data_source():
 
     data = data/(32767)
 
-
     random_number = random.randint(90, 100)
-    
 
     while random_number == output_audio.volume:
         random_number = random.randint(90, 100)
@@ -581,7 +583,6 @@ def update_data_source():
     output_audio.volume = random_number
 
     output_audio.object = "output.wav"
-
 
 
 def update_sliders_value(*events):
@@ -600,54 +601,46 @@ def flatten_callback(event):
 
 
 def toggle_spectrograms_callback(*events):
+
     print(toggle_spectrograms.value)
+
     if toggle_spectrograms.value == True:
+        input_spectrogram_label.visible = True
+        output_spectrogram_label.visible = True
         input_spectrogram.visible = True
         output_spectrogram.visible = True
+
     else:
+        input_spectrogram_label.visible = False
+        output_spectrogram_label.visible = False
         input_spectrogram.visible = False
         output_spectrogram.visible = False
 
-        
-        
+
 def update_spectrograms(*events):
     data = input_source.data["amp"].tolist()
     time = input_source.data["time"]
-    
+
     n_samples = len(time)
     timespan_seconds = time[-1] - time[0]
 
     fs = int(n_samples / timespan_seconds)
 
     fig = Figure()
-    
-    ax = fig.subplots()
-    
-    ax.specgram(data, Fs=fs, NFFT=1024)
-    
-    # fig.colorbar(ax=ax)
-    
-    # plt.specgram(data, Fs=fs, NFFT=1024)
-    # plt.colorbar()
-    # plt.ylabel('Frequency [Hz]')
-    # plt.xlabel('Time [Sec]')
 
-    # # plt.show()
-    # fig = plt.figure()
+    ax = fig.subplots()
+
+    _, _, _, im= ax.specgram(data, Fs=fs, NFFT=1024)
+
+    fig.colorbar(im, ax=ax)
 
     input_spectrogram.object = fig
     output_spectrogram.object = fig
 
-    # plt.close()
-    
-    # input_spectrogram._update_pane()
-    # output_spectrogram._update_pane()
-
-    print(input_spectrogram.dpi)
-    print(output_spectrogram.dpi)
-    print(input_spectrogram.object)
-    print(output_spectrogram.object)
-
+    # print(input_spectrogram.dpi)
+    # print(output_spectrogram.dpi)
+    # print(input_spectrogram.object)
+    # print(output_spectrogram.object)
 
 
 file_input.param.watch(file_input_callback, "filename")
@@ -666,7 +659,6 @@ toggle_spectrograms.param.watch(toggle_spectrograms_callback, "value")
 output_spectrogram.param.watch(update_spectrograms, "dpi")
 
 
-
 in_graph_layout = pn.pane.Bokeh(row(column(
     input_graph)))
 
@@ -680,7 +672,9 @@ in_audio_layout = pn.Row(
 out_audio_layout = pn.Row(
     output_audio_label, output_audio, margin=(15, 0, 15, 50))
 
-spectrograms_layout = pn.Row(input_spectrogram, output_spectrogram)
+
+spectrograms_layout = pn.Row(pn.Column(input_spectrogram_label, input_spectrogram), pn.Column(
+    output_spectrogram_label, output_spectrogram))
 
 visual_sec = pn.Column(info_msg, in_graph_layout,
                        in_audio_layout, out_graph_layout, out_audio_layout, spectrograms_layout, margin=(15, 0, 0, 0))
