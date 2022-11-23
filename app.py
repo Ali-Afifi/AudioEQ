@@ -117,9 +117,9 @@ output_audio_label.visible = False
 
 
 input_spectrogram_label = pn.Row(
-    "#### Input Spectrogram", margin=(0,0,0,50))
+    "#### Input Spectrogram", margin=(0, 0, 0, 50))
 output_spectrogram_label = pn.Row(
-    "#### Output Spectrogram", margin=(0,0,0,50))
+    "#### Output Spectrogram", margin=(0, 0, 0, 50))
 
 
 input_spectrogram_label.visible = False
@@ -235,6 +235,25 @@ def graph_visibility(flag):
         output_audio_label.visible = False
 
 
+def trigger_spectrogram(spec):
+    current = 0
+
+    if spec == "in":
+        current = input_spectrogram.dpi
+    elif spec == "out":
+        current = output_spectrogram.dpi
+
+    random_number = random.randint(143, 144)
+
+    while random_number == current:
+        random_number = random.randint(143, 144)
+
+    if spec == "in":
+        input_spectrogram.dpi = random_number
+    elif spec == "out":
+        output_spectrogram.dpi = random_number
+
+
 def plot_input(type):
 
     if type == "wav":
@@ -244,28 +263,6 @@ def plot_input(type):
         n_samples = len(data)
         time = np.linspace(0, n_samples/fs, num=n_samples)
 
-        # data, fs =  librosa.load("input.wav")
-
-        # MAX = data.max()
-
-        # data = data + MAX
-
-        # data = data - MAX
-
-        # data_fft = fft.rfft(data)
-
-        # data = np.divide(np.abs(data_fft), data.size)
-
-        # data = np.abs(data_fft)
-
-        # time = fft.rfftfreq(n=n_samples, d=1.0/fs)
-
-        # data = fft.irfft(data_fft)
-
-        # time = data_time
-
-        # data = librosa.amplitude_to_db(S=data)
-        # data = librosa.db_to_amplitude(S_db=data)
 
         df = pd.DataFrame(data={
             "time": time,
@@ -274,34 +271,14 @@ def plot_input(type):
 
         df.astype(float)
 
-        # df.to_csv("dow.csv", index=False)
-
-        # print(df["amp"].max())
-
-        # df["amp"] = df["amp"].add(df["amp"].max())
+        
 
         input_source.data = df
         output_source.data = df
 
-        # plt.specgram(data, Fs=fs, NFFT=1024)
-
-        # plt.colorbar()
-
-        # plt.ylabel('Frequency [Hz]')
-        # plt.xlabel('Time [Sec]')
-
-        # # plt.show()
-        # fig = plt.figure()
-        # plt.close()
-
-        print("before:", input_spectrogram.dpi)
-        print("before:", output_spectrogram.dpi)
-
-        input_spectrogram.dpi = 143
-        output_spectrogram.dpi = 143
-
-        # input_spectrogram.object = fig
-        # output_spectrogram.object = fig
+        trigger_spectrogram("in")
+        trigger_spectrogram("out")
+        
 
         input_audio.object = "input.wav"
         output_audio.object = "output.wav"
@@ -314,31 +291,6 @@ def plot_input(type):
         csv_df.columns = ["time", "amp"]
 
         csv_df = csv_df.astype(float)
-
-        # csv_df["amp"] = librosa.amplitude_to_db(S=csv_df["amp"].to_numpy(), ref=1)
-        # csv_df["amp"] = librosa.db_to_amplitude(S_db=csv_df["amp"].to_numpy(), ref=1)
-
-        # data = csv_df["amp"].values
-
-        # times = csv_df["time"].values
-        # n_measurements = len(times)
-        # timespan_seconds = times[-1] - times[0]
-        # sample_rate_hz = int(n_measurements / timespan_seconds)
-
-        # n_samples = len(data)
-
-        # data_time = np.linspace(0, n_samples/sample_rate_hz, num=n_samples)
-
-        # data_fft = fft.rfft(data)
-
-        # data = np.abs(data_fft)*2 / n_samples
-
-        # time = fft.rfftfreq(n=n_samples, d=1.0/sample_rate_hz)
-
-        # csv_df = pd.DataFrame(data={
-        #     "time": time,
-        #     "amp": data
-        # })
 
         input_source.data = csv_df
         output_source.data = csv_df
@@ -358,6 +310,9 @@ def plot_input(type):
 
         sf.write("input.wav", data, sample_rate_hz)
         sf.write("output.wav", data, sample_rate_hz)
+
+        trigger_spectrogram("in")
+        trigger_spectrogram("out")
 
         input_audio.object = "input.wav"
         output_audio.object = "output.wav"
@@ -391,8 +346,8 @@ def update_output_audio(*events):
     output_audio.object = data
     output_audio.sample_rate = fs
 
-    print(output_audio.volume)
-    print(output_audio.object)
+    # print(output_audio.volume)
+    # print(output_audio.object)
 
 
 # def adding_gain(begin, finish, coef):
@@ -581,8 +536,10 @@ def update_data_source():
         random_number = random.randint(90, 100)
 
     output_audio.volume = random_number
-
+    
     output_audio.object = "output.wav"
+
+    trigger_spectrogram("out")
 
 
 def update_sliders_value(*events):
@@ -617,7 +574,7 @@ def toggle_spectrograms_callback(*events):
         output_spectrogram.visible = False
 
 
-def update_spectrograms(*events):
+def update_input_spectrograms(*events):
     data = input_source.data["amp"].tolist()
     time = input_source.data["time"]
 
@@ -630,17 +587,38 @@ def update_spectrograms(*events):
 
     ax = fig.subplots()
 
-    _, _, _, im= ax.specgram(data, Fs=fs, NFFT=1024)
+    fig.supxlabel("time [Second]")
+    fig.supylabel("frequency [Hz]")
+
+    _, _, _, im = ax.specgram(data, Fs=fs, NFFT=1024)
+    
 
     fig.colorbar(im, ax=ax)
 
     input_spectrogram.object = fig
-    output_spectrogram.object = fig
 
-    # print(input_spectrogram.dpi)
-    # print(output_spectrogram.dpi)
-    # print(input_spectrogram.object)
-    # print(output_spectrogram.object)
+
+def update_output_spectrograms(*events):
+    data = output_source.data["amp"].tolist()
+    time = output_source.data["time"]
+
+    n_samples = len(time)
+    timespan_seconds = time[-1] - time[0]
+
+    fs = int(n_samples / timespan_seconds)
+
+    fig = Figure()
+
+    ax = fig.subplots()
+    
+    fig.supxlabel("time [Second]")
+    fig.supylabel("frequency [Hz]")
+    
+    _, _, _, im = ax.specgram(data, Fs=fs, NFFT=1024)
+
+    fig.colorbar(im, ax=ax)
+
+    output_spectrogram.object = fig
 
 
 file_input.param.watch(file_input_callback, "filename")
@@ -655,8 +633,8 @@ output_audio.param.watch(update_output_audio, "volume")
 
 toggle_spectrograms.param.watch(toggle_spectrograms_callback, "value")
 
-# input_spectrogram.param.watch(update_spectrograms, "dpi")
-output_spectrogram.param.watch(update_spectrograms, "dpi")
+input_spectrogram.param.watch(update_input_spectrograms, "dpi")
+output_spectrogram.param.watch(update_output_spectrograms, "dpi")
 
 
 in_graph_layout = pn.pane.Bokeh(row(column(
