@@ -182,6 +182,8 @@ activate_sliders(False)
 
 def file_input_callback(*events):
 
+    flatten_sliders()
+
     for event in events:
         file_name_array = event.new.split(".")
         type = file_name_array[len(file_name_array) - 1]
@@ -240,17 +242,15 @@ def trigger_spectrogram(spec):
 
     if spec == "in":
         current = input_spectrogram.dpi
-    elif spec == "out":
-        current = output_spectrogram.dpi
-
-    random_number = random.randint(143, 144)
-
-    while random_number == current:
         random_number = random.randint(143, 144)
-
-    if spec == "in":
+        while random_number == current:
+            random_number = random.randint(143, 144)
         input_spectrogram.dpi = random_number
     elif spec == "out":
+        current = output_spectrogram.dpi
+        random_number = random.randint(143, 144)
+        while random_number == current:
+            random_number = random.randint(143, 144)
         output_spectrogram.dpi = random_number
 
 
@@ -263,7 +263,6 @@ def plot_input(type):
         n_samples = len(data)
         time = np.linspace(0, n_samples/fs, num=n_samples)
 
-
         df = pd.DataFrame(data={
             "time": time,
             "amp": data
@@ -271,14 +270,11 @@ def plot_input(type):
 
         df.astype(float)
 
-        
-
         input_source.data = df
         output_source.data = df
 
         trigger_spectrogram("in")
         trigger_spectrogram("out")
-        
 
         input_audio.object = "input.wav"
         output_audio.object = "output.wav"
@@ -341,68 +337,19 @@ def update_output_audio(*events):
 
     sf.write("output.wav", data, fs)
 
-    # output_audio.object = "output.wav"
-
     output_audio.object = data
     output_audio.sample_rate = fs
 
-    # print(output_audio.volume)
-    # print(output_audio.object)
+
+def test_calc(freq_list, fft_list, low, high, coef):
+    start = freq_list.index(low)
+    end = freq_list.index(high)
+    band = fft_list[start:end + 1]
+    updated_band = [coef * i for i in band]
+    return updated_band
 
 
-# def adding_gain(begin, finish, coef):
-
-#     amp = input_source.data["amp"].tolist()
-#     time = input_source.data["time"]
-
-#     n_samples = len(amp)
-#     timespan_seconds = time[-1] - time[0]
-
-#     fs = int(n_samples / timespan_seconds)
-
-#     data_fft = rfft(amp).tolist()
-
-#     # abs_data_fft = np.abs(data_fft)
-#     freq = rfftfreq(n=n_samples, d=1.0/fs).tolist()
-
-#     start = freq.index(begin)
-#     end = freq.index(finish)
-
-#     # print(start, end)
-
-#     # print(max(freq))
-
-#     band = data_fft[start:end + 1]
-
-#     updated_band = [coef * i for i in band]
-
-#     data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
-
-#     data = irfft(data_fft)
-
-#     # updated_output_source.data = pd.DataFrame(data={
-#     #     "time": time,
-#     #     "amp": data
-#     # })
-
-#     # update_output_audio()
-
-    # n_measurements = len(data)
-    # timespan_seconds = time[-1] - time[0]
-    # fs = int(n_measurements / timespan_seconds)
-
-    # data = data/(32767)
-
-    # if os.path.exists("output.wav"):
-    #     os.remove("output.wav")
-
-    # sf.write("output.wav", data, fs)
-
-    # output_audio.object = "output.wav"
-
-
-def update_data_source():
-
+def default_mode_gain():
     amp = input_source.data["amp"].tolist()
     time = input_source.data["time"]
 
@@ -413,14 +360,6 @@ def update_data_source():
 
     data_fft = rfft(amp).tolist()
     freq = rfftfreq(n=n_samples, d=1.0/fs).tolist()
-
-    # band = data_fft[start:end + 1]
-
-    # updated_band = [coef * i for i in band]
-
-    # data_fft = data_fft[:start] + updated_band + data_fft[end + 1:]
-
-    # print(fs, n_samples)
 
     for i, value in enumerate(default_sliders_values):
 
@@ -536,15 +475,295 @@ def update_data_source():
         random_number = random.randint(90, 100)
 
     output_audio.volume = random_number
-    
+
     output_audio.object = "output.wav"
+
+
+def music_mode_gain():
+    amp = input_source.data["amp"].tolist()
+    time = input_source.data["time"]
+
+    n_samples = len(amp)
+    timespan_seconds = time[-1] - time[0]
+
+    fs = int(n_samples / timespan_seconds)
+
+    data_fft = rfft(amp).tolist()
+    freq = rfftfreq(n=n_samples, d=1.0/fs).tolist()
+
+    for i, value in enumerate(music_sliders_values):
+
+        coef = 10**(value/20)
+
+        if i == 0:
+            # adding_gain(19.970472013548132, 40.76164835642017, coef)
+            # adding_gain(20, 40, coef)
+            start = freq.index(20)
+            end = freq.index(40)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 1:
+            # adding_gain(41, 80, coef)
+            start = freq.index(41)
+            end = freq.index(80)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 2:
+            # adding_gain(81, 160, coef)
+            start = freq.index(81)
+            end = freq.index(160)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 3:
+            # adding_gain(161, 320, coef)
+            start = freq.index(161)
+            end = freq.index(320)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 4:
+            # adding_gain(321, 640, coef)
+            start = freq.index(321)
+            end = freq.index(640)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 5:
+            # adding_gain(641, 1280, coef)
+            start = freq.index(641)
+            end = freq.index(1280)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 6:
+            # adding_gain(1281, 2560, coef)
+            start = freq.index(1281)
+            end = freq.index(2560)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 7:
+            # adding_gain(2561, 5120, coef)
+            start = freq.index(2561)
+            end = freq.index(5120)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 8:
+            # adding_gain(5121, 10240, coef)
+            start = freq.index(5121)
+            end = freq.index(10240)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 9:
+            # adding_gain(10241, 20000, coef)
+            start = freq.index(10241)
+            try:
+                end = freq.index(20000)
+
+            except ValueError:
+                end = freq.index(max(freq))
+
+            if end < start:
+                tmp = start
+                start = end
+                end = tmp
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+    data = irfft(data_fft)
+
+    output_source.data = pd.DataFrame(data={
+        "time": time,
+        "amp": data
+    })
+
+    data = data/(32767)
+
+    random_number = random.randint(90, 100)
+
+    while random_number == output_audio.volume:
+        random_number = random.randint(90, 100)
+
+    output_audio.volume = random_number
+
+    output_audio.object = "output.wav"
+
+
+def vocals_mode_gain():
+    amp = input_source.data["amp"].tolist()
+    time = input_source.data["time"]
+
+    n_samples = len(amp)
+    timespan_seconds = time[-1] - time[0]
+
+    fs = int(n_samples / timespan_seconds)
+
+    data_fft = rfft(amp).tolist()
+    freq = rfftfreq(n=n_samples, d=1.0/fs).tolist()
+
+    for i, value in enumerate(vocals_sliders_values):
+
+        coef = 10**(value/20)
+
+        if i == 0:
+            # adding_gain(19.970472013548132, 40.76164835642017, coef)
+            # adding_gain(20, 40, coef)
+            start = freq.index(20)
+            end = freq.index(40)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 1:
+            # adding_gain(41, 80, coef)
+            start = freq.index(41)
+            end = freq.index(80)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 2:
+            # adding_gain(81, 160, coef)
+            start = freq.index(81)
+            end = freq.index(160)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 3:
+            # adding_gain(161, 320, coef)
+            start = freq.index(161)
+            end = freq.index(320)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+        elif i == 4:
+            # adding_gain(321, 640, coef)
+            start = freq.index(321)
+            end = freq.index(640)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 5:
+            # adding_gain(641, 1280, coef)
+            start = freq.index(641)
+            end = freq.index(1280)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 6:
+            # adding_gain(1281, 2560, coef)
+            start = freq.index(1281)
+            end = freq.index(2560)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 7:
+            # adding_gain(2561, 5120, coef)
+            start = freq.index(2561)
+            end = freq.index(5120)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 8:
+            # adding_gain(5121, 10240, coef)
+            start = freq.index(5121)
+            end = freq.index(10240)
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+        elif i == 9:
+            # adding_gain(10241, 20000, coef)
+            start = freq.index(10241)
+            try:
+                end = freq.index(20000)
+
+            except ValueError:
+                end = freq.index(max(freq))
+
+            if end < start:
+                tmp = start
+                start = end
+                end = tmp
+
+            band = data_fft[start:end + 1]
+            updated_band = [coef * i for i in band]
+            data_fft = data_fft[:start] + updated_band + data_fft[end+1:]
+
+    data = irfft(data_fft)
+
+    output_source.data = pd.DataFrame(data={
+        "time": time,
+        "amp": data
+    })
+
+    data = data/(32767)
+
+    random_number = random.randint(90, 100)
+
+    while random_number == output_audio.volume:
+        random_number = random.randint(90, 100)
+
+    output_audio.volume = random_number
+
+    output_audio.object = "output.wav"
+
+
+def update_data_source():
+
+    current_mode = modes.value
+
+    if current_mode == "default":
+        default_mode_gain()
+    elif current_mode == "music":
+        music_mode_gain()
+    elif current_mode == "vocals":
+        vocals_mode_gain()
 
     trigger_spectrogram("out")
 
 
 def update_sliders_value(*events):
+    current_mode = modes.value
     for i, s in enumerate([slider1, slider2, slider3, slider4, slider5, slider6, slider7, slider8, slider9, slider10]):
-        default_sliders_values[i] = np.round(s.value, 3)
+
+        if current_mode == "default":
+            default_sliders_values[i] = np.round(s.value, 3)
+        elif current_mode == "music":
+            music_sliders_values[i] = np.round(s.value, 3)
+        elif current_mode == "vocals":
+            vocals_sliders_values[i] = np.round(s.value, 3)
+
     update_data_source()
 
 
@@ -557,9 +776,13 @@ def flatten_callback(event):
     flatten_sliders()
 
 
+def change_mode(*events):
+    flatten_sliders()
+
+
 def toggle_spectrograms_callback(*events):
 
-    print(toggle_spectrograms.value)
+    # print(toggle_spectrograms.value)
 
     if toggle_spectrograms.value == True:
         input_spectrogram_label.visible = True
@@ -574,9 +797,13 @@ def toggle_spectrograms_callback(*events):
         output_spectrogram.visible = False
 
 
-def update_input_spectrograms(*events):
-    data = input_source.data["amp"].tolist()
-    time = input_source.data["time"]
+def update_spectrogram(spec):
+    if spec == "in":
+        data = input_source.data["amp"].tolist()
+        time = input_source.data["time"]
+    elif spec == "out":
+        data = output_source.data["amp"].tolist()
+        time = output_source.data["time"]
 
     n_samples = len(time)
     timespan_seconds = time[-1] - time[0]
@@ -591,34 +818,21 @@ def update_input_spectrograms(*events):
     fig.supylabel("frequency [Hz]")
 
     _, _, _, im = ax.specgram(data, Fs=fs, NFFT=1024)
-    
 
     fig.colorbar(im, ax=ax)
 
-    input_spectrogram.object = fig
+    if spec == "in":
+        input_spectrogram.object = fig
+    elif spec == "out":
+        output_spectrogram.object = fig
+
+
+def update_input_spectrograms(*events):
+    update_spectrogram("in")
 
 
 def update_output_spectrograms(*events):
-    data = output_source.data["amp"].tolist()
-    time = output_source.data["time"]
-
-    n_samples = len(time)
-    timespan_seconds = time[-1] - time[0]
-
-    fs = int(n_samples / timespan_seconds)
-
-    fig = Figure()
-
-    ax = fig.subplots()
-    
-    fig.supxlabel("time [Second]")
-    fig.supylabel("frequency [Hz]")
-    
-    _, _, _, im = ax.specgram(data, Fs=fs, NFFT=1024)
-
-    fig.colorbar(im, ax=ax)
-
-    output_spectrogram.object = fig
+    update_spectrogram("out")
 
 
 file_input.param.watch(file_input_callback, "filename")
@@ -628,6 +842,8 @@ file_input.jslink(input_audio, value="object")
 file_input.jslink(output_audio, value="object")
 
 reset_sliders.on_click(flatten_callback)
+
+modes.param.watch(change_mode, "value")
 
 output_audio.param.watch(update_output_audio, "volume")
 
